@@ -20,43 +20,71 @@ pipeline {
       }
     }
 
+    stage('Install Dependencies') {
+      steps {
+        sh 'npm install'
+      }
+    }
+
     stage('Detect Changed Apps') {
       steps {
         script {
-          def output = sh(
-            script: "turbo run build --dry=json | jq -r '[.tasks[].package] | unique | join(\",\")'",
+          // Run turbo to detect changed apps (returns JSON)
+          def changedAppsJson = sh(
+            script: "turbo run build --dry=json",
             returnStdout: true
           ).trim()
-          env.CHANGED_APPS = output
+
+          // Parse changed packages using jq
+          def changedAppsStr = sh(
+            script: "echo '${changedAppsJson}' | jq -r '[.tasks[].package] | unique | join(\",\")'",
+            returnStdout: true
+          ).trim()
+
+          env.CHANGED_APPS = changedAppsStr
           echo "Changed apps: ${env.CHANGED_APPS}"
         }
       }
     }
 
-    stage('Install Dependencies') {
-        steps {
-            sh 'npm install'
+    stage('List All Apps') {
+      steps {
+        script {
+          // List all directories in apps/
+          def appsList = sh(
+            script: "ls -d apps/* | xargs -n 1 basename",
+            returnStdout: true
+          ).trim().split("\n")
+
+          env.ALL_APPS = appsList.join(",")
+          echo "All apps: ${env.ALL_APPS}"
         }
+      }
     }
 
-    stage('Build Changed Apps') {
-      matrix {
-        axes {
-          axis {
-            name 'APP_NAME'
-            values 'web', 'api' // add all known app names here
-          }
-        }
-        stages {
-          stage('Conditional Build') {
-            when {
-              expression {
-                return env.CHANGED_APPS?.split(',')?.contains(APP_NAME)
+    stage('Build Changed Apps In Parallel') {
+      steps {
+        script {
+          def changedApps = env.CHANGED_APPS?.split(",") ?: []
+          def allApps = env.ALL_APPS?.split(",") ?: []
+
+          // Filter only apps that exist and have changed
+          def appsToBuild = allApps.intersect(changedApps)
+
+          if (appsToBuild.isEmpty()) {
+            echo "No changed apps to build."
+          } else {
+            def buildSteps = [:]
+
+            appsToBuild.each { app ->
+              buildSteps[app] = {
+                stage("Build ${app}") {
+                  sh "turbo run build --filter=${app} --force"
+                }
               }
             }
-            steps {
-              sh "turbo run build --filter=${APP_NAME}"
-            }
+
+            // parallel buildSteps
           }
         }
       }
