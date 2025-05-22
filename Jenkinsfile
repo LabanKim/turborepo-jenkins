@@ -1,51 +1,44 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:22-alpine'
+            args '-u root'
+        }
+    }
 
     environment {
         TURBO_VERSION = 'latest'
-        DOCKER_REGISTRY = 'hub.docker.com'
     }
 
     stages {
         stage('Install Tools') {
-            agent {
-                docker {
-                    image 'node:22-alpine'
-                    args '-u root'
-                }
+            steps {
+                sh '''
+                    apk add --no-cache jq git
+                    npm install -g turbo
+                '''
             }
         }
 
         stage('Detect Changed Apps') {
-            agent {
-                docker {
-                    image 'node:22-alpine'
-                    args '-u root'
-                }
-            }
             steps {
-                sh '''
-                    npm install -g turbo
-                    apk add --no-cache jq git docker-cli
-                '''
                 script {
                     def output = sh(
                         script: "turbo run build --dry=json | jq -r '[.tasks[].package] | unique | join(\",\")'",
                         returnStdout: true
                     ).trim()
-
                     env.CHANGED_APPS = output
                     echo "Changed apps: ${env.CHANGED_APPS}"
                 }
             }
         }
 
-        stage('Build & Push Matrix') {
+        stage('Build Changed Apps') {
             matrix {
                 axes {
                     axis {
                         name 'APP_NAME'
-                        values 'web', 'api' // include all possible apps
+                        values 'web', 'api' // add all your known app names here
                     }
                 }
                 when {
@@ -53,45 +46,8 @@ pipeline {
                         return env.CHANGED_APPS?.split(',')?.contains(APP_NAME)
                     }
                 }
-                agent {
-                    docker {
-                        image 'node:22-alpine'
-                        args '-u root'
-                    }
-                }
-                stages {
-                    stage('Build Docker Image') {
-                        steps {
-                            sh '''
-                                npm install -g turbo
-                                apk add --no-cache jq git docker-cli
-                            '''
-                            script {
-                                def imageTag = "${DOCKER_REGISTRY}/${APP_NAME}:${env.BUILD_NUMBER}"
-                                sh """
-                                    apk add --no-cache docker-cli
-                                    docker build -f apps/${APP_NAME}/Dockerfile -t ${imageTag} .
-                                    echo "Built image: ${imageTag}"
-                                """
-                                env.IMAGE_TAG = imageTag
-                            }
-                        }
-                    }
-
-                    stage('Push Docker Image') {
-                        steps {
-                            sh '''
-                                npm install -g turbo
-                                apk add --no-cache jq git docker-cli
-                            '''
-                            withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                                sh """
-                                    echo "${DOCKER_PASS}" | docker login ${DOCKER_REGISTRY} -u "${DOCKER_USER}" --password-stdin
-                                    docker push ${env.IMAGE_TAG}
-                                """
-                            }
-                        }
-                    }
+                steps {
+                    sh "turbo run build --filter=${APP_NAME}"
                 }
             }
         }
