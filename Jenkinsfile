@@ -104,6 +104,7 @@ pipeline {
       steps {
         script {
           def apps = env.CHANGED_APPS.split(",")
+          sh "echo 'Building Docker images for: ${apps}'"
           def tags = []
 
           for (app in apps) {
