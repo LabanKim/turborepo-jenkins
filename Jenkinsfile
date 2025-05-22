@@ -102,7 +102,7 @@ pipeline {
       }
       
       steps {
-        withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USERNAME')]) {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME')]) {
             script {
             def apps = env.CHANGED_APPS.split(",")
             def tags = []
