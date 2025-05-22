@@ -18,17 +18,22 @@ pipeline {
   stages {
     stage('Install Tools') {
       steps {
-        sh 'node -v && npm -v'
-        sh '''
-          apk add --no-cache jq git
-          npm install -g turbo
-        '''
+        withEnv(["PATH+NODE=${tool 'node-22'}/bin"]) {
+          sh '''
+            node -v
+            npm -v
+            apk add --no-cache jq git docker-cli
+            npm install -g turbo
+          '''
+        }
       }
     }
 
     stage('Install Dependencies') {
       steps {
-        sh 'npm install'
+        withEnv(["PATH+NODE=${tool 'node-22'}/bin"]) {
+          sh 'npm install'
+        }
       }
     }
 
