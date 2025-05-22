@@ -27,27 +27,6 @@ pipeline {
       }
     }
 
-    stage('Detect Changed Apps') {
-      steps {
-        script {
-          // Run turbo to detect changed apps (returns JSON)
-          def changedAppsJson = sh(
-            script: "turbo run build --dry=json",
-            returnStdout: true
-          ).trim()
-
-          // Parse changed packages using jq
-          def changedAppsStr = sh(
-            script: """echo '${changedAppsJson}' | jq -r '[.tasks[] | select(.root | startswith("apps/")) | .package] | unique | join(",")'""",
-            returnStdout: true
-          ).trim()
-
-          env.CHANGED_APPS = changedAppsStr
-          echo "Changed apps: ${env.CHANGED_APPS}"
-        }
-      }
-    }
-
     stage('List All Apps') {
       steps {
         script {
@@ -61,6 +40,31 @@ pipeline {
           echo "All apps: ${env.ALL_APPS}"
         }
       }
+    }
+
+    stage('Detect Changed Apps') {
+        steps {
+            script {
+            // Run turbo to detect changed packages (apps + packages)
+            def changedAppsJson = sh(
+                script: "turbo run build --dry=json",
+                returnStdout: true
+            ).trim()
+
+            // Extract only unique package names from turbo output
+            def changedPackages = sh(
+                script: "echo '${changedAppsJson}' | jq -r '[.tasks[].package] | unique | join(\",\")'",
+                returnStdout: true
+            ).trim().split(",")
+
+            // Filter changedPackages against ALL_APPS
+            def knownApps = env.ALL_APPS?.split(",") ?: []
+            def changedApps = changedPackages.findAll { knownApps.contains(it) }
+
+            env.CHANGED_APPS = changedApps.join(",")
+            echo "Changed apps: ${env.CHANGED_APPS}"
+            }
+        }
     }
 
     stage('Build Changed Apps') {
