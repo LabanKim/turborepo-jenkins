@@ -18,6 +18,7 @@ pipeline {
   stages {
     stage('Install Tools') {
       steps {
+        sh 'node -v && npm -v'
         sh '''
           apk add --no-cache jq git
           npm install -g turbo
