@@ -63,31 +63,28 @@ pipeline {
     }
 
     stage('Build Changed Apps In Parallel') {
-      steps {
-        script {
-          def changedApps = env.CHANGED_APPS?.split(",") ?: []
-          def allApps = env.ALL_APPS?.split(",") ?: []
+        steps {
+            script {
+            def changedApps = (env.CHANGED_APPS?.split(",") ?: []) as List
+            def allApps = (env.ALL_APPS?.split(",") ?: []) as List
 
-          // Filter only apps that exist and have changed
-          def appsToBuild = allApps.intersect(changedApps)
+            def appsToBuild = allApps.intersect(changedApps)
 
-          if (appsToBuild.isEmpty()) {
-            echo "No changed apps to build."
-          } else {
-            def buildSteps = [:]
-
-            appsToBuild.each { app ->
-              buildSteps[app] = {
-                stage("Build ${app}") {
-                  sh "turbo run build --filter=${app} --force"
+            if (appsToBuild.isEmpty()) {
+                echo "No changed apps to build."
+            } else {
+                def buildSteps = [:]
+                appsToBuild.each { app ->
+                buildSteps[app] = {
+                    stage("Build ${app}") {
+                    sh "turbo run build --filter=${app} --force"
+                    }
                 }
-              }
+                }
+                parallel buildSteps
             }
-
-            // parallel buildSteps
-          }
+            }
         }
-      }
     }
   }
 }
