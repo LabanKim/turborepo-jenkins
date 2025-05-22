@@ -12,13 +12,6 @@ pipeline {
   }
 
   stages {
-    agent {
-      docker {
-              image 'node:22-alpine'
-        args '-u root'
-      }
-    }
-
     stage('Install Tools') {
       steps {
         sh '''
