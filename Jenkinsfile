@@ -115,11 +115,11 @@ pipeline {
               def tag = "${DOCKER_USERNAME}/${app}:latest"
               tags << tag
 
-              sh '''
+              sh """
                 apk add --no-cache docker-cli
                 docker build -f apps/${app}/Dockerfile -t ${tag} .
                 echo "Built image: ${tag}"
-              '''
+              """
             }
 
             env.BUILT_DOCKER_TAGS = tags.join(",")
