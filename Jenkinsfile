@@ -18,7 +18,7 @@ pipeline {
         args '-u root'
       }
     }
-    
+
     stage('Install Tools') {
       steps {
         sh '''
@@ -111,21 +111,23 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
             script {
-            def apps = env.CHANGED_APPS.split(",")
-            def tags = []
+                sh 'dockerd-entrypoint.sh & sleep 10' // start Docker daemon and wait
 
-            for (app in apps) {
-                def tag = "${DOCKER_USERNAME}/${app}:latest"
-                tags << tag
+                def apps = env.CHANGED_APPS.split(",")
+                def tags = []
 
-                sh """
-                    apk add --no-cache docker-cli
-                    docker build -f apps/${app}/Dockerfile -t ${tag} .
-                    echo "Built image: ${tag}"
-                """
-            }
+                for (app in apps) {
+                    def tag = "${DOCKER_USERNAME}/${app}:latest"
+                    tags << tag
 
-            env.BUILT_DOCKER_TAGS = tags.join(",")
+                    sh """
+                        apk add --no-cache docker-cli
+                        docker build -f apps/${app}/Dockerfile -t ${tag} .
+                        echo "Built image: ${tag}"
+                    """
+                }
+
+                env.BUILT_DOCKER_TAGS = tags.join(",")
             }
         }
       }
