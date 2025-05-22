@@ -102,23 +102,24 @@ pipeline {
       }
       
       steps {
-        script {
-          def apps = env.CHANGED_APPS.split(",")
-          sh "echo 'Building Docker images for: ${apps}'"
-          def tags = []
+        withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USERNAME')]) {
+            script {
+            def apps = env.CHANGED_APPS.split(",")
+            def tags = []
 
-          for (app in apps) {
-            def tag = "${env.DOCKER_USERNAME}/${app}:latest"
-            tags << tag
+            for (app in apps) {
+                def tag = "${DOCKER_USERNAME}/${app}:latest"
+                tags << tag
 
-            sh """
-                apk add --no-cache docker-cli
-                docker build -f apps/${app}/Dockerfile -t ${tag} .
-                echo "Built image: ${tag}"
-            """
-          }
+                sh """
+                    apk add --no-cache docker-cli
+                    docker build -f apps/${app}/Dockerfile -t ${tag} .
+                    echo "Built image: ${tag}"
+                """
+            }
 
-          env.BUILT_DOCKER_TAGS = tags.join(",")
+            env.BUILT_DOCKER_TAGS = tags.join(",")
+            }
         }
       }
     }
