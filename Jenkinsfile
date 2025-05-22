@@ -1,7 +1,12 @@
 def apps = ['web', 'api']
 
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:22-alpine'
+            args '-u root' // optional if you need root for installs
+        }
+    }
 
     environment {
         DOCKER_BUILDKIT = '1'
