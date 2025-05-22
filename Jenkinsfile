@@ -8,6 +8,7 @@ pipeline {
 
   environment {
     TURBO_VERSION = 'latest'
+    DOCKER_REGISTRY = 'hub.docker.com'
   }
 
   stages {
@@ -86,31 +87,51 @@ pipeline {
                 }
               }
             }
-            // parallel buildSteps
           }
         }
       }
     }
 
-    stage('Docker Build & Push') {
+    stage('Docker Build') {
       when {
-        expression { return env.APPS_TO_DOCKERIZE }
+        expression { return env.CHANGED_APPS }
+      }
+      steps {
+        script {
+          def apps = env.CHANGED_APPS.split(",")
+          def tags = []
+
+          for (app in apps) {
+            def tag = "${env.DOCKER_USERNAME}/${app}:latest"
+            tags << tag
+
+            sh """
+                apk add --no-cache docker-cli
+                docker build -f apps/${APP_NAME}/Dockerfile -t ${imageTag} .
+                echo "Built image: ${imageTag}"
+            """
+          }
+
+          env.BUILT_DOCKER_TAGS = tags.join(",")
+        }
+      }
+    }
+
+   stage('Docker Push') {
+      when {
+        expression { return env.BUILT_DOCKER_TAGS }
       }
       environment {
         DOCKER_CLI_EXPERIMENTAL = 'enabled'
       }
       steps {
-        withCredentials([usernamePassword(credentialsId: '6ef2844b-7697-4d02-aeec-de30293d4e6b', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
           script {
-            def apps = env.APPS_TO_DOCKERIZE.split(",")
             sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
 
-            for (app in apps) {
-              def tag = "${DOCKER_USERNAME}/${app}:latest"
-              sh """
-                docker build -t ${tag} apps/${app}
-                docker push ${tag}
-              """
+            def tags = env.BUILT_DOCKER_TAGS.split(",")
+            for (tag in tags) {
+              sh "docker push ${tag}"
             }
           }
         }
