@@ -38,7 +38,7 @@ pipeline {
 
           // Parse changed packages using jq
           def changedAppsStr = sh(
-            script: "echo '${changedAppsJson}' | jq -r '[.tasks[].package] | unique | join(\",\")'",
+            script: """echo '${changedAppsJson}' | jq -r '[.tasks[] | select(.root | startswith("apps/")) | .package] | unique | join(",")'""",
             returnStdout: true
           ).trim()
 
