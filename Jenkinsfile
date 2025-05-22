@@ -96,6 +96,7 @@ pipeline {
       when {
         expression { return env.CHANGED_APPS }
       }
+      
       steps {
         script {
           def apps = env.CHANGED_APPS.split(",")
@@ -107,7 +108,7 @@ pipeline {
 
             sh """
                 apk add --no-cache docker-cli
-                docker build -f apps/${APP_NAME}/Dockerfile -t ${imageTag} .
+                docker build -f apps/${app}/Dockerfile -t ${imageTag} .
                 echo "Built image: ${imageTag}"
             """
           }
