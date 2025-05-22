@@ -1,8 +1,8 @@
 pipeline {
   agent {
     docker {
-        image 'docker:24.0.5-dind'
-        args '--privileged -u root'
+      image 'docker:24.0.5-dind'
+      args '--privileged -u root'
     }
   }
 
@@ -15,10 +15,10 @@ pipeline {
     stage('Install Tools') {
       steps {
         sh '''
-            apk add --no-cache jq git nodejs npm
-            node -v
-            npm -v
-            npm install -g turbo
+          apk add --no-cache jq git nodejs npm
+          node -v
+          npm -v
+          npm install -g turbo
         '''
       }
     }
@@ -49,14 +49,14 @@ pipeline {
             script {
             // Run turbo to detect changed packages (apps + packages)
             def changedAppsJson = sh(
-                script: "turbo run build --dry=json",
-                returnStdout: true
+              script: "turbo run build --dry=json",
+              returnStdout: true
             ).trim()
 
             // Extract only unique package names from turbo output
             def changedPackages = sh(
-                script: "echo '${changedAppsJson}' | jq -r '[.tasks[].package] | unique | join(\",\")'",
-                returnStdout: true
+              script: "echo '${changedAppsJson}' | jq -r '[.tasks[].package] | unique | join(\",\")'",
+              returnStdout: true
             ).trim().split(",")
 
             // Filter changedPackages against ALL_APPS
@@ -105,25 +105,25 @@ pipeline {
       
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-            script {
-                sh 'dockerd-entrypoint.sh & sleep 10' // start Docker daemon and wait
+          script {
+            sh 'dockerd-entrypoint.sh & sleep 10' // start Docker daemon and wait
 
-                def apps = env.CHANGED_APPS.split(",")
-                def tags = []
+            def apps = env.CHANGED_APPS.split(",")
+            def tags = []
 
-                for (app in apps) {
-                    def tag = "${DOCKER_USERNAME}/${app}:latest"
-                    tags << tag
+            for (app in apps) {
+              def tag = "${DOCKER_USERNAME}/${app}:latest"
+              tags << tag
 
-                    sh """
-                        apk add --no-cache docker-cli
-                        docker build -f apps/${app}/Dockerfile -t ${tag} .
-                        echo "Built image: ${tag}"
-                    """
-                }
-
-                env.BUILT_DOCKER_TAGS = tags.join(",")
+              sh '''
+                apk add --no-cache docker-cli
+                docker build -f apps/${app}/Dockerfile -t ${tag} .
+                echo "Built image: ${tag}"
+              '''
             }
+
+            env.BUILT_DOCKER_TAGS = tags.join(",")
+          }
         }
       }
     }
