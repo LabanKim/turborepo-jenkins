@@ -6,6 +6,10 @@ pipeline {
     }
   }
 
+  tools {
+    nodejs 'node-22'
+  }
+
   environment {
     TURBO_VERSION = 'latest'
     DOCKER_REGISTRY = 'hub.docker.com'
