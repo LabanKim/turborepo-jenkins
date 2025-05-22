@@ -108,8 +108,8 @@ pipeline {
 
             sh """
                 apk add --no-cache docker-cli
-                docker build -f apps/${app}/Dockerfile -t ${imageTag} .
-                echo "Built image: ${imageTag}"
+                docker build -f apps/${app}/Dockerfile -t ${tag} .
+                echo "Built image: ${tag}"
             """
           }
 
