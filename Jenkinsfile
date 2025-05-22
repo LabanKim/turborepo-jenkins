@@ -1,8 +1,8 @@
 pipeline {
   agent {
     docker {
-      image 'node:22-alpine'
-      args '-u root'
+        image 'docker:24.0.5-dind'
+        args '--privileged -u root'
     }
   }
 
@@ -12,6 +12,13 @@ pipeline {
   }
 
   stages {
+    agent {
+      docker {
+              image 'node:22-alpine'
+        args '-u root'
+      }
+    }
+    
     stage('Install Tools') {
       steps {
         sh '''
