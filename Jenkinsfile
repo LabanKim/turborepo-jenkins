@@ -20,16 +20,19 @@ pipeline {
             }
         }
 
-        stage('Install Turbo') {
+        stage('Install Tools') {
             steps {
-                sh 'npm install -g turbo'
+                sh '''
+                    npm install -g turbo
+                    apk add --no-cache jq
+                '''
             }
         }
 
         stage('Determine Changed Apps') {
             steps {
                 script {
-                    changedApps = []
+                    def changedApps = []
                     for (app in apps) {
                         def result = sh(
               script: "turbo run build --filter=${app}^... --dry=json | jq '.tasks | length'",
