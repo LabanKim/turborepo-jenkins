@@ -1,13 +1,9 @@
 pipeline {
   agent {
     docker {
-        image 'docker:24.0.5-dind'
-        args '--privileged -u root'
+      image 'node:22-alpine' // Use image with Node.js and npm preinstalled
+      args '--privileged -u root' // Still needed for Docker-in-Docker
     }
-  }
-
-  tools {
-    nodejs 'node-22'
   }
 
   environment {
@@ -18,29 +14,24 @@ pipeline {
   stages {
     stage('Install Tools') {
       steps {
-        withEnv(["PATH+NODE=${tool 'node-22'}/bin"]) {
-          sh '''
-            node -v
-            npm -v
-            apk add --no-cache jq git docker-cli
-            npm install -g turbo
-          '''
-        }
+        sh '''
+          node -v
+          npm -v
+          apk add --no-cache jq git docker-cli
+          npm install -g turbo
+        '''
       }
     }
 
     stage('Install Dependencies') {
       steps {
-        withEnv(["PATH+NODE=${tool 'node-22'}/bin"]) {
-          sh 'npm install'
-        }
+        sh 'npm install'
       }
     }
 
     stage('List All Apps') {
       steps {
         script {
-          // List all directories in apps/
           def appsList = sh(
             script: "ls -d apps/* | xargs -n 1 basename",
             returnStdout: true
@@ -53,54 +44,43 @@ pipeline {
     }
 
     stage('Detect Changed Apps') {
-        steps {
-            script {
-            // Run turbo to detect changed packages (apps + packages)
-            def changedAppsJson = sh(
-                script: "turbo run build --dry=json",
-                returnStdout: true
-            ).trim()
+      steps {
+        script {
+          def changedAppsJson = sh(
+            script: "turbo run build --dry=json",
+            returnStdout: true
+          ).trim()
 
-            // Extract only unique package names from turbo output
-            def changedPackages = sh(
-                script: "echo '${changedAppsJson}' | jq -r '[.tasks[].package] | unique | join(\",\")'",
-                returnStdout: true
-            ).trim().split(",")
+          def changedPackages = sh(
+            script: "echo '${changedAppsJson}' | jq -r '[.tasks[].package] | unique | join(\",\")'",
+            returnStdout: true
+          ).trim().split(",")
 
-            // Filter changedPackages against ALL_APPS
-            def knownApps = env.ALL_APPS?.split(",") ?: []
-            def changedApps = changedPackages.findAll { knownApps.contains(it) }
+          def knownApps = env.ALL_APPS?.split(",") ?: []
+          def changedApps = changedPackages.findAll { knownApps.contains(it) }
 
-            env.CHANGED_APPS = changedApps.join(",")
-            echo "Changed apps: ${env.CHANGED_APPS}"
-            }
+          env.CHANGED_APPS = changedApps.join(",")
+          echo "Changed apps: ${env.CHANGED_APPS}"
         }
+      }
     }
 
     stage('Build Changed Apps') {
       steps {
         script {
           def changedApps = (env.CHANGED_APPS?.split(",") ?: []) as List
-          def allApps = (env.ALL_APPS?.split(",") ?: []) as List
+          def buildSteps = [:]
 
-          def appsToBuild = []
-          for (app in allApps) {
-            if (changedApps.contains(app)) {
-              appsToBuild << app
+          changedApps.each { app ->
+            buildSteps[app] = {
+              sh "turbo run build --filter=${app} --force"
             }
           }
 
-          if (appsToBuild.isEmpty()) {
-            echo "No apps to build"
+          if (buildSteps) {
+            parallel buildSteps
           } else {
-            def buildSteps = [:]
-            for (app in appsToBuild) {
-              buildSteps[app] = {
-                stage("Build ${app}") {
-                  sh "turbo run build --filter=${app} --force"
-                }
-              }
-            }
+            echo "No apps to build"
           }
         }
       }
@@ -110,38 +90,33 @@ pipeline {
       when {
         expression { return env.CHANGED_APPS }
       }
-      
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-            script {
-                sh 'dockerd-entrypoint.sh & sleep 10' // start Docker daemon and wait
+          script {
+            sh 'dockerd-entrypoint.sh & sleep 10' // Start Docker daemon
 
-                def apps = env.CHANGED_APPS.split(",")
-                def tags = []
+            def apps = env.CHANGED_APPS.split(",")
+            def tags = []
 
-                for (app in apps) {
-                    def tag = "${DOCKER_USERNAME}/${app}:latest"
-                    tags << tag
+            for (app in apps) {
+              def tag = "${DOCKER_USERNAME}/${app}:latest"
+              tags << tag
 
-                    sh """
-                        apk add --no-cache docker-cli
-                        docker build -f apps/${app}/Dockerfile -t ${tag} .
-                        echo "Built image: ${tag}"
-                    """
-                }
-
-                env.BUILT_DOCKER_TAGS = tags.join(",")
+              sh """
+                docker build -f apps/${app}/Dockerfile -t ${tag} .
+                echo "Built image: ${tag}"
+              """
             }
+
+            env.BUILT_DOCKER_TAGS = tags.join(",")
+          }
         }
       }
     }
 
-   stage('Docker Push') {
+    stage('Docker Push') {
       when {
         expression { return env.BUILT_DOCKER_TAGS }
-      }
-      environment {
-        DOCKER_CLI_EXPERIMENTAL = 'enabled'
       }
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
