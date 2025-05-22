@@ -33,6 +33,12 @@ pipeline {
       }
     }
 
+    stage('Install Dependencies') {
+        steps {
+            sh 'npm install'
+        }
+    }
+
     stage('Build Changed Apps') {
       matrix {
         axes {
