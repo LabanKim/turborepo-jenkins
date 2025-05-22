@@ -14,12 +14,6 @@ pipeline {
                     args '-u root'
                 }
             }
-            steps {
-                sh '''
-                    npm install -g turbo
-                    apk add --no-cache jq git docker-cli
-                '''
-            }
         }
 
         stage('Detect Changed Apps') {
@@ -30,6 +24,10 @@ pipeline {
                 }
             }
             steps {
+                sh '''
+                    npm install -g turbo
+                    apk add --no-cache jq git docker-cli
+                '''
                 script {
                     def output = sh(
                         script: "turbo run build --dry=json | jq -r '[.tasks[].package] | unique | join(\",\")'",
@@ -64,6 +62,10 @@ pipeline {
                 stages {
                     stage('Build Docker Image') {
                         steps {
+                            sh '''
+                                npm install -g turbo
+                                apk add --no-cache jq git docker-cli
+                            '''
                             script {
                                 def imageTag = "${DOCKER_REGISTRY}/${APP_NAME}:${env.BUILD_NUMBER}"
                                 sh """
@@ -78,6 +80,10 @@ pipeline {
 
                     stage('Push Docker Image') {
                         steps {
+                            sh '''
+                                npm install -g turbo
+                                apk add --no-cache jq git docker-cli
+                            '''
                             withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                                 sh """
                                     echo "${DOCKER_PASS}" | docker login ${DOCKER_REGISTRY} -u "${DOCKER_USER}" --password-stdin
