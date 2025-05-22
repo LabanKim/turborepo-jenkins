@@ -69,34 +69,34 @@ pipeline {
         }
     }
 
-    stage('Build Changed Apps') {
-      steps {
-        script {
-          def changedApps = (env.CHANGED_APPS?.split(",") ?: []) as List
-          def allApps = (env.ALL_APPS?.split(",") ?: []) as List
+    // stage('Build Changed Apps') {
+    //   steps {
+    //     script {
+    //       def changedApps = (env.CHANGED_APPS?.split(",") ?: []) as List
+    //       def allApps = (env.ALL_APPS?.split(",") ?: []) as List
 
-          def appsToBuild = []
-          for (app in allApps) {
-            if (changedApps.contains(app)) {
-              appsToBuild << app
-            }
-          }
+    //       def appsToBuild = []
+    //       for (app in allApps) {
+    //         if (changedApps.contains(app)) {
+    //           appsToBuild << app
+    //         }
+    //       }
 
-          if (appsToBuild.isEmpty()) {
-            echo "No apps to build"
-          } else {
-            def buildSteps = [:]
-            for (app in appsToBuild) {
-              buildSteps[app] = {
-                stage("Build ${app}") {
-                  sh "turbo run build --filter=${app} --force"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    //       if (appsToBuild.isEmpty()) {
+    //         echo "No apps to build"
+    //       } else {
+    //         def buildSteps = [:]
+    //         for (app in appsToBuild) {
+    //           buildSteps[app] = {
+    //             stage("Build ${app}") {
+    //               sh "turbo run build --filter=${app} --force"
+    //             }
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
 
     stage('Docker Build') {
       when {
